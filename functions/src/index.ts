@@ -13,6 +13,9 @@ const typeDefs = gql`
     style: String
     website: String
   }
+  type Mutation {
+    setHotdog(isKosher:Boolean, location:String, name:String, style:String, website:String):Hotdog
+  }
   type Query {
     hotdogs: [Hotdog]
   }
@@ -27,7 +30,16 @@ const resolvers = {
         .once("value")
         .then(snap => snap.val())
         .then(val => Object.keys(val).map(key => val[key]))
-  }
+  },
+  Mutation: {
+    setHotdog: (parent: any, args: any) => {
+      const db = admin.database();
+      const ref = db.ref("hotdogs");
+      const test = ref.push({ isKosher: args.isKosher, location: args.location, name: args.name, style: args.style, website: args.website });
+      console.log(test);
+      return args;
+    }
+  },
 };
 
 const app = express();
@@ -35,9 +47,3 @@ const server = new ApolloServer({ typeDefs, resolvers });
 server.applyMiddleware({ app, path: "/", cors: true });
 export const graphql = functions.https.onRequest(app);
 
-// // Start writing Firebase Functions
-// // https://firebase.google.com/docs/functions/typescript
-//
-export const helloWorld = functions.https.onRequest((request, response) => {
-  response.send("Hello from Firebase!");
-});
