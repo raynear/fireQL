@@ -63,3 +63,5 @@ node_modules/
 
 # dotenv environment variables file
 .env
+functions/house-rental-8c426-firebase-adminsdk-q3as5-b21b515bbd.json
+functions/package-lock.json
