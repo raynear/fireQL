@@ -86,26 +86,19 @@ const resolvers = {
         .then(snap => snap.val())
         .then(val => Object.keys(val).map(key => val[key]));
     },
-    buildings: () => {
-      return admin
-        .database()
-        .ref("buildings")
-        .once("value")
-        .then(snap => snap.val())
-        .then(val => Object.keys(val).map(key => val[key]));
-    },
-    building(parent, args, context, info) {
-      console.log("parent", parent);
-      console.log("context", context);
-      console.log("info", info);
+    buildings: async () => {
       const Ref = admin.database().ref("buildings");
-      Ref.orderByChild('name').equalTo(args.name).on('child_added', function (snap) {
-        const value = snap.val();
-        console.log("snap", value);
-        const c = Object.keys(value).map(key => value[key]);
-        console.log(c);
-        return c;
-      });
+      const snap = await Ref.once("value");
+      const value = await snap.val();
+      const test = Object.keys(value).map(key => value[key]);
+      return test;
+    },
+    async building(parent, args, context, info) {
+      const Ref = admin.database().ref("buildings");
+      const snap = await Ref.orderByChild('name').equalTo(args.name).once("value");
+      const value = await snap.val();
+      const test = value[Object.keys(value)[0]];
+      return test;
     }
   },
   Mutation: {
@@ -113,14 +106,12 @@ const resolvers = {
       const db = admin.database();
       const ref = db.ref("hotdogs");
       const test = ref.push({ isKosher: args.isKosher, location: args.location, name: args.name, style: args.style, website: args.website });
-      console.log(test);
       return args;
     },
     addBuilding: (parent: any, args: any) => {
       const db = admin.database();
       const ref = db.ref("buildings");
       const test = ref.push({ name: args.name, address: args.address });
-      console.log(test);
       return args;
     }
   },
