@@ -11,13 +11,6 @@ admin.initializeApp({
 });
 
 const typeDefs = gql`
-  type Hotdog {
-    isKosher: Boolean
-    location: String
-    name: String
-    style: String
-    website: String
-  }
   enum RentType {
     DAY
     MONTH
@@ -51,12 +44,14 @@ const typeDefs = gql`
     photo: String
   }
   type Room {
+    id: String
     name: String
     floor: Int
     equipment: [Equipment]
     photos: [String]
   }
   type Building {
+    id: String
     name: String
     address: String
     rooms: [Room]
@@ -64,55 +59,73 @@ const typeDefs = gql`
     manager: Worker
   }
   type Mutation {
-    setHotdog(isKosher:Boolean, location:String, name:String, style:String, website:String):Hotdog
     addBuilding(name:String, address:String):Building
-    addRoom(name:String, floor:Int, building:String):Room
+    addRoom(buildingId:String, name:String, floor:Int):Room
   }
   type Query {
-    hotdogs: [Hotdog]
     buildings: [Building]
-    building(name:String): Building
-    rooms: [Room]
+    buildingByName(name:String): Building
+    building(id:String): Building
+    rooms(buildingId:String): [Room]
+    room(buildingId:String, roomId:String): Room
   }
 `;
 
 const resolvers = {
   Query: {
-    hotdogs: () => {
-      return admin
-        .database()
-        .ref("hotdogs")
-        .once("value")
-        .then(snap => snap.val())
-        .then(val => Object.keys(val).map(key => val[key]));
-    },
-    buildings: async () => {
+    async buildings(parent, args, context, info) {
       const Ref = admin.database().ref("buildings");
       const snap = await Ref.once("value");
-      const value = await snap.val();
-      const test = Object.keys(value).map(key => value[key]);
-      return test;
+      const value = snap.val();
+      const RetObject = [];
+      snap.forEach((childSnap) => {
+        const aVal = childSnap.val();
+        aVal['id'] = childSnap.key;
+        RetObject.push(aVal);
+      });
+      // const test = Object.keys(value).map(key => value[key]);
+      console.log(RetObject);
+      return RetObject;
     },
-    async building(parent, args, context, info) {
+    async buildingByName(parent, args, context, info) {
       const Ref = admin.database().ref("buildings");
       const snap = await Ref.orderByChild('name').equalTo(args.name).once("value");
-      const value = await snap.val();
+      let aVal;
+      snap.forEach((childSnap) => {
+        aVal = childSnap.val();
+        aVal['id'] = childSnap.key;
+      })
+      return aVal;
+    },
+    async room(parent, args, context, info) {
+      const Ref = admin.database().ref("buildings/" + args.buildingId);
+      const snap = await Ref.once("value");
+      console.log("snap", snap.key, snap.val());
+      const value = snap.val();
+      console.log("value", value);
       const test = value[Object.keys(value)[0]];
+      // get room
       return test;
     }
   },
   Mutation: {
-    setHotdog: (parent: any, args: any) => {
-      const db = admin.database();
-      const ref = db.ref("hotdogs");
-      const test = ref.push({ isKosher: args.isKosher, location: args.location, name: args.name, style: args.style, website: args.website });
-      return args;
+    async addBuilding(parent, args, context, info) {
+      const ref = admin.database().ref("buildings");
+      const newRef = ref.push({ name: args.name, address: args.address });
+      console.log("newRef", newRef);
+      const ret = args['id'] = newRef;
+      console.log("ret", ret);
+      return ret;
     },
-    addBuilding: (parent: any, args: any) => {
-      const db = admin.database();
-      const ref = db.ref("buildings");
-      const test = ref.push({ name: args.name, address: args.address });
-      return args;
+    async addRoom(parent, args, context, info) {
+      const Ref = admin.database().ref("buildings/" + args.buildingId);
+      const newRef = Ref.push({ name: args.name, floor: args.floor });
+      const nr = (await newRef).toString().split("/");
+      console.log("newRef", nr[nr.length - 1]);
+      const ret = args;
+      ret['id'] = nr[nr.length - 1];
+      console.log("ret", ret);
+      return ret;
     }
   },
 };
