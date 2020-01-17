@@ -97,15 +97,42 @@ const resolvers = {
       })
       return aVal;
     },
-    async room(parent, args, context, info) {
+    async rooms(parent, args, context, info) {
       const Ref = admin.database().ref("buildings/" + args.buildingId);
+      // const childRef = await Ref.child("rooms");
+      // const childSnap = await childRef.once("value");
+      // const childValue = childSnap.val();
+      // childSnap.forEach((aSnap) => {
+      //   console.log("aSnap", aSnap.val());
+      // });
+      //      const val = await (await childRef.once("value")).val();
+      //      val.forEach((childSnap) => {
+      //        console.log("ASDFASDFSDF", childSnap);
+      //      });
+      const snap = await Ref.once("value");
+      console.log("snap", snap.key, snap.val());
+      const value = snap.val();
+      const RetObject = [];
+      snap.forEach((aSnap) => {
+        const aVal = aSnap.val();
+        console.log("aVal", aVal);
+        if (aVal.name) {
+          aVal['id'] = aSnap.key;
+          RetObject.push(aVal);
+        }
+      });
+      console.log(RetObject);
+      // get room
+      return RetObject;
+    },
+    async room(parent, args, context, info) {
+      const Ref = admin.database().ref("buildings/" + args.buildingId + "/" + args.roomId);
       const snap = await Ref.once("value");
       console.log("snap", snap.key, snap.val());
       const value = snap.val();
       console.log("value", value);
-      const test = value[Object.keys(value)[0]];
-      // get room
-      return test;
+      value['id'] = snap.key;
+      return value;
     }
   },
   Mutation: {
