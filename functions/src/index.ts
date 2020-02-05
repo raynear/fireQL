@@ -67,7 +67,7 @@ const typeDefs = gql`
     delRoom(buildingId:String!, roomId:String!):Room
   }
   type Query {
-    buildingByName(name:String): Building
+    buildingsByName(name:String): [Building]
     building(buildingId:String): Building
     buildings: [Building]
     rooms(buildingId:String): [Room]
@@ -75,117 +75,146 @@ const typeDefs = gql`
   }
 `;
 
+const building = async (parent, args, context, info) => {
+  const doc = await admin.firestore().collection("buildings").doc(args.buildingId);
+  const snap = await doc.get();
+  if (snap.exists) {
+    const data = snap.data();
+    data['id'] = snap.id;
+    data['rooms'] = await rooms(parent, args, context, info);
+    return data;
+  }
+  return;
+}
+
+const buildings = async (parent, args, context, info) => {
+  const coll = admin.firestore().collection("buildings");
+  const snap = await coll.get();
+  const ret = [];
+  for (let i = 0; i < snap.size; i++) {
+    const aBuilding = building(false, { buildingId: snap.docs[i].id }, false, false);
+    ret.push(aBuilding);
+  }
+  return ret;
+}
+
+const buildingsByName = async (parent, args, context, info) => {
+  const coll = admin.firestore().collection("buildings");
+  const snap = await coll.where("name", "==", args.name).get();
+  const ret = [];
+  for (let i = 0; i < snap.size; i++) {
+    const aDoc = snap.docs[i].data();
+    aDoc['id'] = snap.docs[i].id;
+    ret.push(aDoc);
+  }
+  return ret;
+}
+
+const room = async (parent, args, context, info) => {
+  const doc = admin.firestore().collection("buildings").doc(args.buildingId).collection('rooms').doc(args.roomId);
+  const snap = await doc.get();
+
+  if (snap.exists) {
+    const data = snap.data();
+    data['id'] = snap.id;
+    return data;
+  }
+  return;
+}
+
+const rooms = async (parent, args, context, info) => {
+  const coll = admin.firestore().collection("buildings").doc(args.buildingId).collection('rooms');
+  const roomsSnap = await coll.get();
+
+  const ret = [];
+  for (let i = 0; i < roomsSnap.size; i++) {
+    const aDoc = roomsSnap.docs[i].data();
+    aDoc['id'] = roomsSnap.docs[i].id;
+    ret.push(aDoc);
+  }
+  return ret;
+}
+
+
+const addBuilding = async (parent, args, context, info) => {
+  const coll = admin.firestore().collection("buildings");
+  const doc = coll.doc();
+  await doc.set({ name: args.name, address: args.address });
+  const snap = await doc.get();
+  if (snap.exists) {
+    const data = snap.data();
+    data['id'] = snap.id;
+    return data;
+  }
+  return;
+}
+
+const editBuilding = async (parent, args, context, info) => {
+  const data = { name: args.name, address: args.address };
+
+  const doc = await admin.firestore().collection("buildings").doc(args.buildingId);
+  const updateSingle = doc.update(data);
+  console.log("updateSingle", updateSingle);
+  const snap = await doc.get();
+  if (snap.exists) {
+    const ret = snap.data();
+    ret['id'] = snap.id;
+    return ret;
+  }
+  return;
+}
+
+const delBuilding = async (parent, args, context, info) => {
+  const delDoc = await admin.firestore().collection("buildings").doc(args.buildingId).delete();
+  console.log(delDoc);
+  return delDoc;
+}
+
+const addRoom = async (parent, args, context, info) => {
+  const coll = await admin.firestore().collection("buildings").doc(args.buildingId).collection('rooms');
+  const doc = await coll.add({ name: args.name, floor: args.floor });
+  console.log("doc", doc);
+  const snap = await doc.get();
+  console.log("snap", snap);
+  if (snap.exists) {
+    const data = snap.data();
+    data['id'] = snap.id;
+    console.log("data", data);
+    return data;
+  }
+  return;
+}
+
+const editRoom = async (parent, args, context, info) => {
+  const data = { name: args.name, floor: args.floor };
+
+  const doc = await admin.firestore().collection("buildings").doc(args.buildingId).collection('rooms').doc(args.roomId);
+  const updateSingle = doc.update(data);
+  console.log("updateSingle", updateSingle);
+  const snap = await doc.get();
+  if (snap.exists) {
+    const ret = snap.data();
+    ret['id'] = snap.id;
+    return ret;
+  }
+  return;
+}
+
+const delRoom = async (parent, args, context, info) => {
+  const delDoc = await admin.firestore().collection("buildings").doc(args.buildingId).collection('rooms').doc(args.roomId).delete();
+  console.log(delDoc);
+  return delDoc;
+}
+
 const resolvers = {
   Query: {
-    async buildingByName(parent, args, context, info) {
-      const ref = admin.database().ref("buildings");
-      const snap = await ref.orderByChild('name').equalTo(args.name).once("value");
-      let aVal;
-      snap.forEach((childSnap) => {
-        aVal = childSnap.val();
-        aVal['id'] = childSnap.key;
-      })
-      return aVal;
-    },
-    async building(parent, args, context, info) {
-      const ref = admin.database().ref("buildings/" + args.buildingId);
-      const snap = await ref.once("value");
-      console.log("snap", snap.key, snap.val());
-      const value = snap.val();
-      value['id'] = snap.key;
-      return value;
-    },
-    async buildings(parent, args, context, info) {
-      const ref = admin.database().ref("buildings");
-      const snap = await ref.once("value");
-      const value = snap.val();
-      const retObject = [];
-      snap.forEach((childSnap) => {
-        const aVal = childSnap.val();
-        aVal['id'] = childSnap.key;
-        retObject.push(aVal);
-      });
-      // const test = Object.keys(value).map(key => value[key]);
-      console.log(retObject);
-      return retObject;
-    },
-    async room(parent, args, context, info) {
-      const ref = admin.database().ref("buildings/" + args.buildingId + "/" + args.roomId);
-      const snap = await ref.once("value");
-      console.log("snap", snap.key, snap.val());
-      const value = snap.val();
-      console.log("value", value);
-      value['id'] = snap.key;
-      return value;
-    },
-    async rooms(parent, args, context, info) {
-      const ref = admin.database().ref("buildings/" + args.buildingId);
-      // const childRef = await Ref.child("rooms");
-      // const childSnap = await childRef.once("value");
-      // const childValue = childSnap.val();
-      // childSnap.forEach((aSnap) => {
-      //   console.log("aSnap", aSnap.val());
-      // });
-      //      const val = await (await childRef.once("value")).val();
-      //      val.forEach((childSnap) => {
-      //        console.log("ASDFASDFSDF", childSnap);
-      //      });
-      const snap = await ref.once("value");
-      console.log("snap", snap.key, snap.val());
-      const value = snap.val();
-      const RetObject = [];
-      snap.forEach((aSnap) => {
-        const aVal = aSnap.val();
-        console.log("aVal", aVal);
-        if (aVal.name) {
-          aVal['id'] = aSnap.key;
-          RetObject.push(aVal);
-        }
-      });
-      console.log(RetObject);
-      // get room
-      return RetObject;
-    }
+    building, buildings, buildingsByName,
+    room, rooms
   },
   Mutation: {
-    async addBuilding(parent, args, context, info) {
-      const ref = admin.database().ref("buildings");
-      const newRef = ref.push({ name: args.name, address: args.address });
-      console.log("newRef", newRef);
-      const ret = args['id'] = newRef;
-      console.log("ret", ret);
-      return ret;
-    },
-    async editBuilding(parent, args, context, info) {
-      // console.log("args", args);
-      const data = { name: args.name, address: args.address };
-
-      const ref2 = admin.database().ref("buildings/" + args.buildingId);
-      await ref2.update(data);
-      const snap = await ref2.once("value");
-      const retObject = snap.val();
-      retObject['id'] = snap.key;
-      return retObject;
-
-    },
-    async delBuilding(parent, args, context, info) {
-      const ref = admin.database().ref("buildings/" + args.buildingId);
-      const res = await ref.remove()
-        .then((r: any) => { return r; })
-        .catch((e: any) => { console.log(e); });
-      return res;
-    },
-    async addRoom(parent, args, context, info) {
-      const ref = admin.database().ref("buildings/" + args.buildingId);
-      const newRef = ref.push({ name: args.name, floor: args.floor });
-      const nr = (await newRef).toString().split("/");
-      console.log("newRef", nr[nr.length - 1]);
-      const ret = args;
-      ret['id'] = nr[nr.length - 1];
-      console.log("ret", ret);
-      return ret;
-    }
-  },
+    addBuilding, editBuilding, delBuilding,
+    addRoom, editRoom, delRoom
+  }
 };
 
 const app = express()
